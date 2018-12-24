@@ -36,6 +36,7 @@ stest: stest.o
 
 clean:
 	rm -f dmenu stest $(OBJ) dmenu-$(VERSION).tar.gz
+	rm -f dmenu-cweb.idx dmenu-cweb.log dmenu-cweb.scn dmenu-cweb.toc
 
 dist: clean
 	mkdir -p dmenu-$(VERSION)
