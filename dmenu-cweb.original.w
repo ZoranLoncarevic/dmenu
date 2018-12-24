@@ -255,15 +255,13 @@ static Clr *scheme[SchemeLast];
 	clip = XInternAtom(dpy, "CLIPBOARD",   False);
 	utf8 = XInternAtom(dpy, "UTF8_STRING", False);
 
-@ Menu height depends on line height and number of lines, if menu is vertical.
+@ Menu height depends on font height and number of lines, if menu is vertical.
 We calculate it first, since menu vertical position depends on it, in case it
-is being placed at the bottom of the screen. Default line height of font height
-plus 2 pixels can be overriden by configuration parameter {\tt lineheight}.
+is being placed at the bottom of the screen.
 
 @<Calculate menu geometry...@>=
 
 	bh = drw->fonts->h + 2;
-	bh = MAX(bh, lineheight);
 	lines = MAX(lines, 0);
 	mh = (lines + 1) * bh;
 
@@ -486,16 +484,14 @@ third of that line.
 	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
 	x += inputw;
 
-@ Cursor is drawn as a two-pixel wide vertical line. {\it Since min. line
-height patch, {\tt fh} below stands for a font height; vertical offset alligns
-cursor with text now centered within potentially heigher {\tt dmenu} line.}
+@ Cursor is drawn as a two-pixel wide vertical line.
 
 @<Draw cursor@>=
 
 	curpos = TEXTW(text) - TEXTW(&text[cursor]);
 	if ((curpos += lrpad / 2 - 1) < w) {
 		drw_setscheme(drw, scheme[SchemeNorm]);
-		drw_rect(drw, x + curpos, 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
+		drw_rect(drw, x + curpos, 2, 2, bh - 4, 1, 0);
 	}
 
 @ Vertical list is easier to draw.
@@ -1972,8 +1968,8 @@ for itself. (See table immediately below for an overview of supported options.)
 		colors[SchemeSel][ColFg] = argv[++i];
 	else if (OPT("w"))   /* embedding window id */
 		embed = argv[++i];
-	else @<Check for min line height patch option@>@;
-	else usage();
+	else
+		usage();
 
 @ Two-line instructions regarding use of this program are printed to |stderr|
 upon user request (via an option {\tt -h}) or when invalid option is specified.
@@ -1982,8 +1978,7 @@ upon user request (via an option {\tt -h}) or when invalid option is specified.
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"@/
-	      "             [-m monitor] [-h height]\n"@/
+	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -2204,54 +2199,5 @@ static unsigned int lines      = 0;
 
 @(config.h@>+=
 static const char worddelimiters[] = " ";
-
-@* Local patches.
-
-@ {\bf Line height.\ } This patch due to {\tt Xarchus@@comcast.net} is taken
-directly from suckless official page\footnote*{\tt https://tools.suckless.org/
-dmenu/patches/line-height/dmenu-lineheight-4.7.diff}.
-It adds new command line option to set the minimum height of {\tt dmenu}
-line, for better integration with other UI elements that require a particular
-vertical size; for example, in order to completely cover the panel bar it
-partially overlaps.
-
-@ Line height is determined by a new configuration parameter {\tt lineheight}.
-
-@(config.h@>+=
-static unsigned int lineheight = 0;         /* -h option; minimum height of a menu line      */
-
-@ It simply overrides default line height of font height plus 2 pixels.
-
-@<Calculate menu geometry...@>=
-
-	bh = drw->fonts->h + 2;
-	bh = MAX(bh, lineheight);
-	lines = MAX(lines, 0);
-	mh = (lines + 1) * bh;
-
-@ Since text is vertically centered anyway, the only thing that needs
-adjusting is vertical cursor position in the input line.
-
-@<Draw cursor@>=
-
-	curpos = TEXTW(text) - TEXTW(&text[cursor]);
-	if ((curpos += lrpad / 2 - 1) < w) {
-		drw_setscheme(drw, scheme[SchemeNorm]);
-		drw_rect(drw, x + curpos, 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
-	}
-
-@ Variable |fh| above stands for font height.
-
-@<Local variables (drawmenu)@>+=
-
-	int fh = drw->fonts->h;
-
-@ All of this is controlled by new command line option {\tt -h}.
-
-@<Check for min line height patch option@>=
-
-	if (!strcmp(argv[i], "-h")) {  /* minimum height of one menu line  */
-			lineheight = atoi(argv[++i]);
-			lineheight = MAX(lineheight, 8); }
 
 @* The End.
