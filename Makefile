@@ -14,6 +14,12 @@ options:
 	@echo "LDFLAGS  = $(LDFLAGS)"
 	@echo "CC       = $(CC)"
 
+dvi: dmenu-cweb.dvi
+	rm -f dmenu-cweb.idx dmenu-cweb.log dmenu-cweb.scn dmenu-cweb.toc
+
+pdf: dmenu-cweb.dvi
+	dvipdfm dmenu-cweb
+
 .c.o:
 	$(CC) -c $(CFLAGS) $<
 
