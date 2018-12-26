@@ -265,7 +265,7 @@ plus 2 pixels can be overriden by configuration parameter {\tt lineheight}.
 	bh = drw->fonts->h + 2;
 	bh = MAX(bh, lineheight);
 	lines = MAX(lines, 0);
-	mh = (lines + 1) * bh;
+	mh = (lines + 1) * (bh + intlinegap);
 
 @ If client wasn't compiled with {\tt XINERAMA} support or {\tt XINERAMA}
 extension isn't active on the server, simply set menu's geometry according
@@ -464,7 +464,8 @@ progress, when list is vertical.
 
 @<Local variables (drawmenu)@>=
 
-	int x = 0, y = 0;
+	int x = 0, y = intlinegap/2;
+	int w;
 
 @ First, we draw the prompt, if it was specified on the command line; note how
 |x| is advanced by the width of the prompt.
@@ -472,7 +473,7 @@ progress, when list is vertical.
 @<Draw prompt@>=
 	if (prompt && *prompt) {
 		drw_setscheme(drw, scheme[SchemeSel]);
-		x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
+		x = drw_text(drw, x, y, promptw, bh, lrpad / 2, prompt, 0);
 	}
 
 @ Input field occupies the entire first line when list is vertical or when
@@ -483,7 +484,7 @@ third of that line.
 
 	w = (lines > 0 || !matches) ? mw - x : inputw;
 	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
+	drw_text(drw, x, y, w, bh, lrpad / 2, text, 0);
 	x += inputw;
 
 @ Cursor is drawn as a two-pixel wide vertical line. {\it Since min. line
@@ -495,14 +496,14 @@ cursor with text now centered within potentially heigher {\tt dmenu} line.}
 	curpos = TEXTW(text) - TEXTW(&text[cursor]);
 	if ((curpos += lrpad / 2 - 1) < w) {
 		drw_setscheme(drw, scheme[SchemeNorm]);
-		drw_rect(drw, x + curpos, 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
+		drw_rect(drw, x + curpos, y + 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
 	}
 
 @ Vertical list is easier to draw.
 
 @<Draw vertical list@>=
 	for (item = curr; item != next; item = item->right) @/
-		drawitem(item, x, y += bh, mw - x);
+		drawitem(item, x, y += intlinegap+bh, mw - x);
 
 @ Horizontal list consists of optional two characters |'<'| and |'>'| at it's
 left and right end signaling that there are more menu items in the appropriate
@@ -514,21 +515,21 @@ empty space.)
 	w = TEXTW("<");
 	if (curr->left) {
 		drw_setscheme(drw, scheme[SchemeNorm]);
-		drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
+		drw_text(drw, x, y, w, bh, lrpad / 2, "<", 0);
 	}
 	x += w;
 
 @ @<Draw horizontal list@>+=
 
 	for (item = curr; item != next; item = item->right)
-		x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
+		x = drawitem(item, x, y, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
 
 @ @<Draw horizontal list@>+=
 
 	if (next) {
 		w = TEXTW(">");
 		drw_setscheme(drw, scheme[SchemeNorm]);
-		drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
+		drw_text(drw, mw - w, y, w, bh, lrpad / 2, ">", 0);
 	}
 
 @ Finally, resulting PixMap is copied onto the menu window
@@ -1973,6 +1974,7 @@ for itself. (See table immediately below for an overview of supported options.)
 	else if (OPT("w"))   /* embedding window id */
 		embed = argv[++i];
 	else @<Check for min line height patch option@>@;
+	else @<Check for inter-line gap option@>@;
 	else usage();
 
 @ Two-line instructions regarding use of this program are printed to |stderr|
@@ -1983,7 +1985,7 @@ static void
 usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"@/
-	      "             [-m monitor] [-h height]\n"@/
+	      "             [-m monitor] [-h height] [-gp gap]\n"@/
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -2253,5 +2255,88 @@ adjusting is vertical cursor position in the input line.
 	if (!strcmp(argv[i], "-h")) {  /* minimum height of one menu line  */
 			lineheight = atoi(argv[++i]);
 			lineheight = MAX(lineheight, 8); }
+
+@ {\bf Inter-line gap.\ } The next patch in a way goes together with
+the one preceding it; it adds a new command line option to set inter-line
+gap when menu is displayed in vertical mode. This is controlled by a new
+configuration parameter {\tt intlinegap}.
+
+@(config.h@>+=
+static unsigned int intlinegap = 0;         /* -gp option; inter-line gap                    */
+
+@ The widget must provide space for these gaps.
+
+@<Calculate menu geometry...@>=
+
+	bh = drw->fonts->h + 2;
+	bh = MAX(bh, lineheight);
+	lines = MAX(lines, 0);
+	mh = (lines + 1) * (bh + intlinegap);
+
+@ Aside from some additional command line parsing, all remaining changes are
+confined to the function |drawmenu|. All elements in the first line of the
+widget are shifted down by an offset of |intlinegap/2| to account for upper
+half of inter-line gap.
+
+@<Local variables (drawmenu)@>=
+
+	int x = 0, y = intlinegap/2;
+	int w;
+
+@ @<Draw prompt@>=
+	if (prompt && *prompt) {
+		drw_setscheme(drw, scheme[SchemeSel]);
+		x = drw_text(drw, x, y, promptw, bh, lrpad / 2, prompt, 0);
+	}
+
+@ @<Draw input field@>=
+
+	w = (lines > 0 || !matches) ? mw - x : inputw;
+	drw_setscheme(drw, scheme[SchemeNorm]);
+	drw_text(drw, x, y, w, bh, lrpad / 2, text, 0);
+	x += inputw;
+
+@ @<Draw cursor@>=
+
+	curpos = TEXTW(text) - TEXTW(&text[cursor]);
+	if ((curpos += lrpad / 2 - 1) < w) {
+		drw_setscheme(drw, scheme[SchemeNorm]);
+		drw_rect(drw, x + curpos, y + 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
+	}
+
+@ @<Draw horizontal list@>=
+	w = TEXTW("<");
+	if (curr->left) {
+		drw_setscheme(drw, scheme[SchemeNorm]);
+		drw_text(drw, x, y, w, bh, lrpad / 2, "<", 0);
+	}
+	x += w;
+
+@ @<Draw horizontal list@>+=
+
+	for (item = curr; item != next; item = item->right)@/
+		x = drawitem(item, x, y, MIN(TEXTW(aitem->text), mw - x - TEXTW(">")));
+
+@ @<Draw horizontal list@>+=
+
+	if (next) {
+		w = TEXTW(">");
+		drw_setscheme(drw, scheme[SchemeNorm]);
+		drw_text(drw, mw - w, y, w, bh, lrpad / 2, ">", 0);
+	}
+
+@ When menu is in vertical mode, we skip |intlinegap| pixels between each
+two subsequent lines.
+
+@<Draw vertical list@>=
+	for (item = curr; aitem != next; item = item->right) @/
+		drawitem(item, x, y += intlinegap+bh, mw - x);
+
+@ Inter-line gap parameter is controlled by a command line option {\tt -gp}.
+
+@<Check for inter-line gap option@>=
+
+	else if (!strcmp(argv[i], "-gp"))  /* inter-line gap  */
+		intlinegap = atoi(argv[++i]);
 
 @* The End.
