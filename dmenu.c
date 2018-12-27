@@ -650,6 +650,11 @@ setup(void)
 		y = topbar ? 0 : wa.height - mh;
 		mw = wa.width;
 	}
+
+	x += geomx;
+	y += topbar ? geomy : -geomy;
+	mw = geomw  ? geomw : mw - geomx;
+
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
 	match();
@@ -688,6 +693,7 @@ usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-h height] [-gp gap] \n"
+	      "             [-x xoffset] [-y yoffset] [-w width]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -726,6 +732,12 @@ main(int argc, char *argv[])
 			lineheight = MAX(lineheight, 8); }
 		else if (!strcmp(argv[i], "-gp"))  /* inter-line gap  */
 			intlinegap = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-x"))   /* geometry */
+			geomx = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-y"))
+			geomy = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-w"))
+			geomw = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-nb"))  /* normal background color */
 			colors[SchemeNorm][ColBg] = argv[++i];
 		else if (!strcmp(argv[i], "-nf"))  /* normal foreground color */

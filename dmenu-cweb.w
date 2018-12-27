@@ -211,6 +211,7 @@ setup(void)
 	@<Initialize color schemes@>;@/
 	@<Prepare to fetch X selection@>;@/
 	@<Calculate menu geometry with respect to {\tt XINERAMA}@>;
+	@<Apply geometry as specified on the command line@>;
 	@<Create menu window@>;
 	@<Open input methods@>;
 	@<Put menu on the screen@>;
@@ -1971,10 +1972,11 @@ for itself. (See table immediately below for an overview of supported options.)
 		colors[SchemeSel][ColBg] = argv[++i];
 	else if (OPT("sf"))  /* selected foreground color */
 		colors[SchemeSel][ColFg] = argv[++i];
-	else if (OPT("w"))   /* embedding window id */
+	else if (OPT("wi"))  /* embedding window id */
 		embed = argv[++i];
 	else @<Check for min line height patch option@>@;
 	else @<Check for inter-line gap option@>@;
+	else @<Check for geometry options@>;
 	else usage();
 
 @ Two-line instructions regarding use of this program are printed to |stderr|
@@ -1986,7 +1988,8 @@ usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"@/
 	      "             [-m monitor] [-h height] [-gp gap]\n"@/
-	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
+	      "             [-x xofffset] [-y yoffset] [-w width]"@/
+	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-wi windowid]\n", stderr);
 	exit(1);
 }
 
@@ -2338,5 +2341,36 @@ two subsequent lines.
 
 	else if (!strcmp(argv[i], "-gp"))  /* inter-line gap  */
 		intlinegap = atoi(argv[++i]);
+
+@ {\bf Position and width.\ } This patch adds options {\tt -x}, {\tt -y}
+and {\tt -w} setting window position on the target monitor and it's width
+respectively; if option {\t -b} is used, y offset is measured from the
+bottom of the screen. Window geometry is controlled by three configuration
+parameters.
+
+@(config.h@>+=
+
+static int geomx = 0, geomy = 0;            /* options -x, -y, -w, -h: widget geometry       */
+static int geomw = 0;
+
+@ After menu geometry has been determined with respect to {\tt XINERAMA},
+we apply geometry specified on the command line.
+
+@<Apply geometry...@>=
+
+	x += geomx;
+	y += topbar ? geomy : -geomy;
+	mw = geomw  ? geomw : mw - geomx;
+
+@ This is controlled by three new command line options.
+
+@<Check for geometry options@>=
+
+	else @+if (!strcmp(argv[i], "-x"))@t\2@>
+		geomx = atoi(argv[++i]);
+	else if (!strcmp(argv[i], "-y"))
+		geomy = atoi(argv[++i]);
+	else if (!strcmp(argv[i], "-w"))
+		geomw = atoi(argv[++i]);
 
 @* The End.

@@ -20,7 +20,7 @@ dmenu \- dynamic menu
 .IR color ]
 .RB [ \-sf
 .IR color ]
-.RB [ \-w
+.RB [ \-wi
 .IR windowid ]
 .P
 .BR dmenu_run " ..."
@@ -56,6 +56,17 @@ dmenu uses a menu line of at least 'height' pixels tall, but no less than 8.
 .BI \-gp " gap"
 dmenu uses inter-line gap of 'gap' pixels.
 .TP
+.BI \-x " xoffset"
+dmenu is placed at this offset measured from the left side of the monitor.
+.TP
+.BI \-y " yoffset"
+dmenu is placed at this offset measured from the top of the monitor. If the
+.B \-b
+option is used, the offset is measured from the bottom.
+.TP
+.BI \-w " width"
+sets the width of the dmenu window.
+.TP
 .BI \-m " monitor"
 dmenu is displayed on the monitor number supplied. Monitor numbers are starting
 from 0.
@@ -84,7 +95,7 @@ defines the selected foreground color.
 .B \-v
 prints version information to stdout, then exits.
 .TP
-.BI \-w " windowid"
+.BI \-wi " windowid"
 embed into windowid.
 .SH USAGE
 dmenu is completely controlled by the keyboard.  Items are selected using the

@@ -18,6 +18,9 @@ static unsigned int lines      = 0;
 static unsigned int lineheight = 0;         /* -h option; minimum height of a menu line      */
 static unsigned int intlinegap = 0;         /* -gp option; inter-line gap                    */
 
+static int geomx = 0, geomy = 0;            /* options -x, -y, -w, -h: widget geometry       */
+static int geomw = 0;
+
 /*
  * Characters not considered part of a word while deleting words
  * for example: " /?\"&[]"
