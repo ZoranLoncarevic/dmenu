@@ -2438,4 +2438,11 @@ margin.
 	else y += topbar ? geomy : -geomy;@#
 	mw = geomw  ? geomw : mw - geomx;
 
+@ Command line option {\tt -center} is an abbreviation for {\tt -xc -yc}.
+
+@<Check for centering options@>+=
+
+	else if (!strcmp(argv[i], "-center"))
+		centerx = centery = 1;
+
 @* The End.

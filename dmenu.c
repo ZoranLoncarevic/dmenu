@@ -723,6 +723,8 @@ main(int argc, char *argv[])
 			centerx = 1;
 		else if (!strcmp(argv[i], "-yc"))
 			centery = 1;
+		else if (!strcmp(argv[i], "-center"))
+			centerx = centery = 1;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
