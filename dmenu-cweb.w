@@ -286,6 +286,7 @@ to dimensions of X server's default screen.
 		x = 0;
 		y = topbar ? 0 : wa.height - mh;
 		mw = wa.width;
+		sh = wa.height;
 	}
 
 @ Now that we have dimensions and positions of all monitors on the logical
@@ -323,6 +324,7 @@ window and put menu on the monitor with which it intersects the most.
 	x = info[i].x_org;
 	y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
 	mw = info[i].width;
+	sh = info[i].height;
 	XFree(info);
 
 @ Xlib function |XQueryTree| is used to traverse hierarchy of windows on the screen;
@@ -1952,7 +1954,9 @@ for itself. (See table immediately below for an overview of supported options.)
 	else if (OPT("i")) {			/* case-insensitive item matching */
 		fstrncmp = strncasecmp;
 		fstrstr = cistrstr;
-	} else if (i + 1 == argc)
+	}
+	else @<Check for centering options@>@;
+	else if (i + 1 == argc)
 		usage();
 
 @ @<Check for options that take one argument@>=
@@ -1988,7 +1992,7 @@ usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"@/
 	      "             [-m monitor] [-h height] [-gp gap]\n"@/
-	      "             [-x xofffset] [-y yoffset] [-w width]"@/
+	      "             [-x xofffset] [-y yoffset] [-w width] [-xc] [-yc]\n"@/
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-wi windowid]\n", stderr);
 	exit(1);
 }
@@ -2372,5 +2376,66 @@ we apply geometry specified on the command line.
 		geomy = atoi(argv[++i]);
 	else if (!strcmp(argv[i], "-w"))
 		geomw = atoi(argv[++i]);
+
+@ {\bf Horizontal and vertical centering.\ } Two additional configuration
+parameters determine whether menu window should be centered in horizontal
+and vertical direction.
+
+@(config.h@>+=
+static int centerx = 0, centery = 0;
+
+@ These parameters are controlled by two command line options {\tt -xc}
+and {\tt -yc}.
+
+@<Check for centering options@>=
+
+	if (!strcmp(argv[i], "-xc"))
+		centerx = 1;
+	else if (!strcmp(argv[i], "-yc"))
+		centery = 1;
+
+@ For vertical centering, we need screen height.
+
+@<Local variables (setup)@>=
+
+	int sh;
+
+@ @<Calculate menu geometry...@>=
+
+#ifdef XINERAMA
+	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
+		@<Get menu geometry from {\tt XINERAMA}@>;
+	} else
+#endif
+	{
+		if (!XGetWindowAttributes(dpy, parentwin, &wa))
+			die("could not get embedding window attributes: 0x%lx",
+			    parentwin);
+		x = 0;
+		y = topbar ? 0 : wa.height - mh;
+		mw = wa.width;
+		sh = wa.height;
+	}
+
+@ @<Get menu geometry from...@>+=
+
+	x = info[i].x_org;
+	y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
+	mw = info[i].width;
+	sh = info[i].height;
+	XFree(info);
+
+@ If no window width is specified on the command line, default width spans
+the whole screen and thus renders horizontal centering a noop; in that case,
+horizontal centering uses x offset, if specified, as total width of the
+margin.
+
+@<Apply geometry...@>=
+
+	if (centerx) x = (geomw ? mw - geomw : geomx) / 2;
+	else x += geomx;@#
+	if (centery) y = (sh - mh) / 2;
+	else y += topbar ? geomy : -geomy;@#
+	mw = geomw  ? geomw : mw - geomx;
 
 @* The End.

@@ -587,6 +587,7 @@ static void
 setup(void)
 {
 	int x, y, i, j;
+	int sh;
 	unsigned int du;
 	XSetWindowAttributes swa;
 	XIM xim;
@@ -639,6 +640,7 @@ setup(void)
 		x = info[i].x_org;
 		y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
 		mw = info[i].width;
+		sh = info[i].height;
 		XFree(info);
 	} else
 #endif
@@ -649,10 +651,14 @@ setup(void)
 		x = 0;
 		y = topbar ? 0 : wa.height - mh;
 		mw = wa.width;
+		sh = wa.height;
 	}
 
-	x += geomx;
-	y += topbar ? geomy : -geomy;
+	/* apply geometry specified on the command line */
+	if (centerx) x = (geomw ? mw - geomw : geomx) / 2;
+	else x += geomx;
+	if (centery) y = (sh - mh) / 2;
+	else y += topbar ? geomy : -geomy;
 	mw = geomw  ? geomw : mw - geomx;
 
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
@@ -693,7 +699,7 @@ usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-h height] [-gp gap] \n"
-	      "             [-x xoffset] [-y yoffset] [-w width]\n"
+	      "             [-x xoffset] [-y yoffset] [-w width] [-xc] [-yc]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -713,6 +719,10 @@ main(int argc, char *argv[])
 			topbar = 0;
 		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
 			fast = 1;
+		else if (!strcmp(argv[i], "-xc"))
+			centerx = 1;
+		else if (!strcmp(argv[i], "-yc"))
+			centery = 1;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;

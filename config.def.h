@@ -20,6 +20,7 @@ static unsigned int intlinegap = 0;         /* -gp option; inter-line gap       
 
 static int geomx = 0, geomy = 0;            /* options -x, -y, -w, -h: widget geometry       */
 static int geomw = 0;
+static int centerx = 0, centery = 0;
 
 /*
  * Characters not considered part of a word while deleting words
