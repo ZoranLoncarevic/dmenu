@@ -22,6 +22,8 @@ static int geomx = 0, geomy = 0;            /* options -x, -y, -w, -h: widget ge
 static int geomw = 0;
 static int centerx = 0, centery = 0;
 
+static int dynheight = 0;                   /* -dyn option; if 1, dynamicaly adjust menu height */
+
 /*
  * Characters not considered part of a word while deleting words
  * for example: " /?\"&[]"

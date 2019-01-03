@@ -46,6 +46,7 @@ static struct item *items = NULL;
 static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
+static int actualheight = 0;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -135,6 +136,7 @@ drawmenu(void)
 	struct item *item;
 	int x = 0, y = intlinegap/2, w;
 	int fh = drw->fonts->h;
+	int linesdrawn = 0;
 
 	drw_setscheme(drw, scheme[SchemeNorm]);
 	drw_rect(drw, 0, 0, mw, mh, 1, 1);
@@ -156,7 +158,7 @@ drawmenu(void)
 
 	if (lines > 0) {
 		/* draw vertical list */
-		for (item = curr; item != next; item = item->right)
+		for (item = curr; item != next; item = item->right, linesdrawn++)
 			drawitem(item, x, y += intlinegap+bh, mw - x);
 	} else if (matches) {
 		/* draw horizontal list */
@@ -174,6 +176,11 @@ drawmenu(void)
 			drw_setscheme(drw, scheme[SchemeNorm]);
 			drw_text(drw, mw - w, y, w, bh, lrpad / 2, ">", 0);
 		}
+	}
+
+	if (dynheight && actualheight != linesdrawn) {
+		XResizeWindow(drw->dpy, win, mw, (linesdrawn + 1) * (bh + intlinegap));
+		actualheight = linesdrawn;
 	}
 	drw_map(drw, win, 0, 0, mw, mh);
 }
@@ -663,6 +670,7 @@ setup(void)
 
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
+	actualheight = lines;
 	match();
 
 	/* create menu window */
@@ -719,6 +727,8 @@ main(int argc, char *argv[])
 			topbar = 0;
 		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
 			fast = 1;
+		else if (!strcmp(argv[i], "-dyn"))
+			dynheight = 1;
 		else if (!strcmp(argv[i], "-xc"))
 			centerx = 1;
 		else if (!strcmp(argv[i], "-yc"))

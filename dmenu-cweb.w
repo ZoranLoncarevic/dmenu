@@ -449,7 +449,9 @@ drawmenu(void)
 	@<Draw cursor@>;@#
 
 	if (lines > 0) @<Draw vertical list@>;
-	else if (matches) @<Draw horizontal list@>;
+	else if (matches) @<Draw horizontal list@>;@#
+
+	@<Resize window, if necessary@>;
 	drw_map(drw, win, 0, 0, mw, mh);
 }
 
@@ -492,7 +494,8 @@ third of that line.
 
 @ Cursor is drawn as a two-pixel wide vertical line. {\it Since min. line
 height patch, {\tt fh} below stands for a font height; vertical offset alligns
-cursor with text now centered within potentially heigher {\tt dmenu} line.}
+cursor with text now centered within potentially heigher
+{\tt dmenu} line.}
 
 @<Draw cursor@>=
 
@@ -505,7 +508,7 @@ cursor with text now centered within potentially heigher {\tt dmenu} line.}
 @ Vertical list is easier to draw.
 
 @<Draw vertical list@>=
-	for (item = curr; item != next; item = item->right) @/
+	for (item = curr; item != next; item = item->right, linesdrawn++) @/
 		drawitem(item, x, y += intlinegap+bh, mw - x);
 
 @ Horizontal list consists of optional two characters |'<'| and |'>'| at it's
@@ -2444,5 +2447,48 @@ margin.
 
 	else if (!strcmp(argv[i], "-center"))
 		centerx = centery = 1;
+
+@ {\bf Dynamically resize dmenu window.\ } Configuration parameter |dynheight|
+controls an option to keep dynamically resizing dmenu window so that it never
+gets larger then it's necessary to show matched menu items.
+
+@(config.h@>+=
+
+	static int dynheight = 0;
+
+@ Global variable |actualheight| at any given time keeps track of current window
+height.
+
+@<Global variables@>+=
+
+	static int actualheight = 0;
+
+@ At the start of the program, it is initialized to match dmenu height on
+startup.
+
+@<Apply geometry...@>+=
+
+	actualheight = lines;
+
+@ The remaining changes are all confined to the function |drawmenu|. We count
+menu items as they are beeing drawn in vertical mode.
+
+@<Local variables (drawmenu)@>+=
+
+	int linesdrawn = 0;
+
+@ @<Draw vertical list@>=
+	for (item = curr; item != next; item = item->right, linesdrawn++) @/
+		drawitem(item, x, y += intlinegap+bh, mw - x);
+
+@ If this number doesn't match the actual widow size while |dynheight|
+option is active, we take action and resize the window.
+
+@<Resize window, if necessary@>=
+
+	if (dynheight && actualheight != linesdrawn) {
+		XResizeWindow(drw->dpy, win, mw, (linesdrawn + 1) * (bh + intlinegap));
+		actualheight = linesdrawn;
+	}
 
 @* The End.
