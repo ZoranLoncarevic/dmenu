@@ -106,6 +106,7 @@ static Window root;
 
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
+	@<Find the right visual@>;
 
 @ For the time being, we ignore the possibility of embedding menu into
 user window via {\tt -w} command line option, simply setting |parentwin==root|
@@ -131,7 +132,7 @@ and stored internally in that module.
 	if (!XGetWindowAttributes(dpy, parentwin, &wa))
 		die("could not get embedding window attributes: 0x%lx",
 		    parentwin);
-	drw = drw_create(dpy, screen, root, wa.width, wa.height);
+	drw = drw_create(dpy, screen, root, wa.width, wa.height, visual, depth, cmap, translucency_enabled);
 
 @ Loading of fonts is abstracted to module {\tt drw.c}. All main program
 needs to know is font height that is also used to determine the amount
@@ -1253,6 +1254,12 @@ items are marked with |sel->out=1|.
 			sel->out = 1;
 		break;
 
+@ This concludes the source of the main program; the next setion deals with
+the module {\tt drw} containing graphical primitives used to draw the widget.
+
+@<Drw module functions@>+=
+/* Drw module functions.  */
+
 @* Module {\tt drw}. This module contains graphical primitives used to draw
 the widget. Even though this is an X client, it's UI is essentially 
 {\sl Text-based user interface}, so everything boils down to drawing text.
@@ -1308,7 +1315,7 @@ stands, Pixmap is allocated with dimensions inferred from the root window, only
 to be immediately deallocated and allocated again when program determines right
 dimensions for the widget, even if they are the same.
 
-@<Drw module functions@>=
+@<Drw module functions@>+=
 Drw *
 drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h)
 {
@@ -1341,7 +1348,7 @@ drw_resize(Drw *drw, unsigned int w, unsigned int h)
 	drw->h = h;
 	if (drw->drawable)
 		XFreePixmap(drw->dpy, drw->drawable);
-	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, DefaultDepth(drw->dpy, drw->screen));
+	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, drw->depth);
 }
 
 @ Destructor for |struct Drw| first frees Pixmap, then graphic context and
@@ -1353,6 +1360,7 @@ drw_free(Drw *drw)
 {
 	XFreePixmap(drw->dpy, drw->drawable);
 	XFreeGC(drw->dpy, drw->gc);
+	XFreeColormap(drw->dpy, drw->cmap);
 	free(drw);
 }
 
@@ -1580,9 +1588,7 @@ so as to not interfere with calculations and trigger clipping.
 	if (render) {
 		XSetForeground(drw->dpy, drw->gc, drw->scheme[invert ? ColFg : ColBg].pixel);
 		XFillRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h);
-		d = XftDrawCreate(drw->dpy, drw->drawable,
-		                  DefaultVisual(drw->dpy, drw->screen),
-		                  DefaultColormap(drw->dpy, drw->screen));
+		d = XftDrawCreate(drw->dpy, drw->drawable, drw->visual, drw->cmap);
 		x += lpad;
 		w -= lpad;
 	} else  w = ~w;
@@ -2490,5 +2496,287 @@ option is active, we take action and resize the window.
 		XResizeWindow(drw->dpy, win, mw, (linesdrawn + 1) * (bh + intlinegap));
 		actualheight = linesdrawn;
 	}
+
+@ {\bf Support for translucent colors.\ } For aesthetics reasons, it is sometimes
+desireable to overlay menu over an existing image on screen using completely
+transparent or partially translucent background color. In order to make this
+possible, we add yet another way to specify color using syntax {\tt \#AARRGGBB}
+that contains a value for an alpha channel.
+
+@ On many X servers installed on hardware that support translucent colors,
+they are not supported by default visual, usually a 24-bit Truecolor.
+So, before doing anything else, we need to find the right visual.
+
+@s XVisualInfo int
+@s XRenderPictFormat int
+@<Find the right visual@>=
+
+	XVisualInfo *infos;
+	XRenderPictFormat *fmt;
+	int nitems, i;@/
+
+	XVisualInfo tpl = {
+		screen = screen,
+		depth = 32,
+		class = TrueColor
+	};
+	long masks = VisualScreenMask | VisualDepthMask | VisualClassMask;
+
+	visual = NULL;
+	infos = XGetVisualInfo(dpy, masks, &tpl, &nitems);
+	for(i = 0; i < nitems; i++) {
+		fmt = XRenderFindVisualFormat(dpy, infos[i].visual);
+		if (fmt->type == PictTypeDirect && fmt->direct.alphaMask)@/
+			@<Use visual |infos[i].visual|@>;
+	}
+	XFree(infos);
+
+	if (!visual) @<Use default visual@>;
+
+@ We store visual, it's color depth and private color map in corresponding
+global variables.
+
+@s Visual int
+@s Colormap int
+@<Global variables@>+=
+
+	static Visual *visual;
+	static int depth;
+	static Colormap cmap;
+	static int translucency_enabled = 0;
+
+@ If an appropriate visual has been found, we use it to enable translucency.
+
+@<Use visual |infos[i].visual|@>=
+
+	visual = infos[i].visual;
+	depth = infos[i].depth;
+	cmap = XCreateColormap(dpy, parentwin, visual, AllocNone);
+	translucency_enabled = 1;
+	break;
+
+@ Otherwise, we stick to default one, disabling translucency.
+
+@<Use default visual@>=
+	visual = DefaultVisual(dpy, screen);
+	depth = DefaultDepth(dpy, screen);
+	cmap = DefaultColormap(dpy, screen);
+	translucency_enabled = 0;
+
+@ This visual is further passed on to {\tt drw} module.
+
+@<Get root window...@>=
+
+	parentwin = root;
+	if (!XGetWindowAttributes(dpy, parentwin, &wa))
+		die("could not get embedding window attributes: 0x%lx",
+		    parentwin);
+	drw = drw_create(dpy, screen, root, wa.width, wa.height, visual, depth, cmap, translucency_enabled);
+
+@ Finaly, we use this visual while creating actual window. Note that
+we now also explicitly set border pixel and newly allocated private
+color map, as we are no longer in position to rely on CopyFromParent,
+since parent bit depth might not be the same.
+
+@<Create menu window@>=
+
+	swa.override_redirect = True;
+	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+	swa.border_pixel = 0;
+	swa.colormap = cmap;
+	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
+	                    depth, CopyFromParent, visual,
+	                    CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWColormap | CWEventMask, &swa);
+	XSetClassHint(dpy, win, &ch);
+
+@ Module {\tt drw} also needs to know about the visual used, it's color depth
+and private color map.\break These values are passed over during initialization
+and stored within |struct Drw|.
+
+@<Definition of |struct Drw|@>=
+
+typedef struct {
+	unsigned int w, h;
+	Display *dpy;
+	int screen;
+	Window root;
+	Visual *visual;
+	unsigned int depth;
+	Colormap cmap;
+	int translucency_enabled;
+	Drawable drawable;
+	GC gc;
+	Clr *scheme;
+	Fnt *fonts;
+} Drw;
+
+@ @<Drw module functions@>=
+Drw *
+drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h,@t\1@>@/
+		Visual *visual, unsigned int depth, Colormap cmap, int translucency_enabled)@t\2\4@>
+{
+	Drw *drw = ecalloc(1, sizeof(Drw));
+
+	drw->dpy = dpy;
+	drw->screen = screen;
+	drw->root = root;
+	drw->w = w;
+	drw->h = h;
+	drw->visual = visual;
+	drw->depth = depth;
+	drw->cmap = cmap;
+	drw->translucency_enabled = translucency_enabled;
+	drw->drawable = XCreatePixmap(dpy, root, w, h, depth);
+	drw->gc = XCreateGC(dpy, drw->drawable, 0, NULL);
+	XSetLineAttributes(dpy, drw->gc, 1, LineSolid, CapButt, JoinMiter);
+
+	return drw;
+}
+
+@ These values are then used in communication with X server while allocating
+PixMap in the function above and throughout the module instead of default ones.
+
+@<Drw module functions@>+=
+void
+drw_resize(Drw *drw, unsigned int w, unsigned int h)
+{
+	if (!drw)
+		return;
+
+	drw->w = w;
+	drw->h = h;
+	if (drw->drawable)
+		XFreePixmap(drw->dpy, drw->drawable);
+	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, drw->depth);
+}
+
+@ @<Drw module functions@>+=
+void
+drw_free(Drw *drw)
+{
+	XFreePixmap(drw->dpy, drw->drawable);
+	XFreeGC(drw->dpy, drw->gc);
+	XFreeColormap(drw->dpy, drw->cmap);
+	free(drw);
+}
+
+@ @<Prepare to draw text@>=
+
+	if (render) {
+		XSetForeground(drw->dpy, drw->gc, drw->scheme[invert ? ColFg : ColBg].pixel);
+		XFillRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h);
+		d = XftDrawCreate(drw->dpy, drw->drawable, drw->visual, drw->cmap);
+		x += lpad;
+		w -= lpad;
+	} else  w = ~w;
+
+@ Having switched to the right visual, we are now free to use translucent colors.
+Function |drw_clr_create| is changed to produce translucent colors from strings of
+the form {\tt \#AARRGGBB}.
+
+@<Drw module functions@>+=
+void
+drw_clr_create(Drw *drw, Clr *dest, const char *clrname)
+{
+	char buff[8] = "#";
+	const char *clrname1 = clrname;
+
+	if (!drw || !dest || !clrname)@/
+		return;@#
+
+	@<Deal with {\tt \#AARRGGBB} specification@>;@#
+
+	if (!XftColorAllocName(drw->dpy, drw->visual, drw->cmap, clrname1, dest))
+		die("error, cannot allocate color '%s'", clrname);@#
+
+	@<Make sure {\tt \#RRGGBB} produces opaque color@>;
+}
+
+@ If translucency is enabled we are working with TrueColor visual and
+there is no need to allocate colors, so we directly set |dest->pixel|;
+otherwise, we strip first two hex digits representing the value of an
+alpha channel and proceed to create an opaque color.
+
+@<Deal with {\tt \#AARRGGBB} specification@>=
+
+	if (isargb(clrname))
+		if (drw->translucency_enabled) {
+			dest->pixel = strtoargb(clrname);
+			return;
+		} else
+			clrname1 = strcat(buff, clrname + 3);
+
+@ When translucency is enabled, designation {\tt \#RRGGBB} actually
+produces completely transparent color (since alpha channel amounts
+to 0), and this needs to be fixed.
+
+@d OPAQUE 0xFFU
+@<Make sure {\tt \#RRGGBB} produces opaque color@>=
+
+	if (drw->translucency_enabled)@/
+		dest->pixel = (dest->pixel & 0x00ffffffU) | (OPAQUE << 24);
+
+@ In the code above we have used two helper functions |isargb| and
+|strtoargb|; the former to test whether given string is of the form
+{\tt "\#AARRBBGG"} that designates translucent color.
+
+@<Functions@>+=
+int isargb(const char *clrname)
+{
+	int n=8;
+
+	if (*clrname != '#')@/
+		return 0;@#
+
+	while (isxdigit(*++clrname) && n--) @t/$*$ noop $*$/\quad@> ;
+
+	return !*clrname && !n;
+}
+
+@ Since X server expects {\it pre-multiplied alphas}, converting
+hexadecimal string representation of translucent color to |long int|
+involves replacing value $v$ of each of red, green and blue
+channels with $$\lfloor {\alpha v \over 256}  \rfloor .$$
+
+@d BADCOLOR 0xFFFFFFFFU
+@<Functions@>+=
+
+unsigned long int strtoargb(const char *clrname)
+{
+	int alpha, result;
+	long int result;
+
+	if (*clrname != '#')@/
+		return BADCOLOR;@#
+
+	alpha = twohexdigitstoi(clrname + 1);@#
+
+	result  = alpha << 24;
+	result |= (twohexdigitstoi(clrname + 3) * alpha << 8) & 0xFFFFFF00;
+	result |= (twohexdigitstoi(clrname + 5) * alpha ) & 0xFFFFFF00;
+	result |=  twohexdigitstoi(clrname + 7) * alpha >> 8;@#
+
+	return result;
+}
+
+@ @<Functions@>+=
+
+int twohexdigitstoi(const char *s)
+{
+	return (hexdigittoi(s) << 4) | hexdigittoi(s+1);
+}
+
+@ @<Functions@>+=
+
+int hexdigittoi(const char *s)
+{
+	if (isdigit(*s))@/
+		return *s - '0';
+	else if (isalpha(*s))@/
+		return *s - (isupper(*s) ? 'A' : 'a') + 10;
+	else
+		return 0;
+}
 
 @* The End.

@@ -6,3 +6,6 @@
 
 void die(const char *fmt, ...);
 void *ecalloc(size_t nmemb, size_t size);
+
+int isargb(const char *clrname);
+unsigned long int strtoargb(const char *clrname);
