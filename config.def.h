@@ -23,6 +23,7 @@ static int geomw = 0;
 static int centerx = 0, centery = 0;
 
 static int dynheight = 0;                   /* -dyn option; if 1, dynamicaly adjust menu height */
+static int enable_alpha = 0;                /* -alpha, -noalpha; enable/disable translucency    */
 
 /*
  * Characters not considered part of a word while deleting words

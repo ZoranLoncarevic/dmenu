@@ -1965,6 +1965,7 @@ for itself. (See table immediately below for an overview of supported options.)
 		fstrstr = cistrstr;
 	}
 	else @<Check for centering options@>@;
+	else @<Check for alpha options@>@;
 	else if (i + 1 == argc)
 		usage();
 
@@ -2531,7 +2532,7 @@ So, before doing anything else, we need to find the right visual.
 	}
 	XFree(infos);
 
-	if (!visual) @<Use default visual@>;
+	if (!visual || !enable_alpha) @<Use default visual@>;
 
 @ We store visual, it's color depth and private color map in corresponding
 global variables.
@@ -2778,5 +2779,25 @@ int hexdigittoi(const char *s)
 	else
 		return 0;
 }
+
+@ Because some window managers and compositors treat differently windows
+with depth of 32 bits (for example, by not rendering shadows on the window),
+we leave it up to the user to enable or disable translucent color support.
+This is controlled by a configuration parameter |enable_alpha| and
+command line options \hbox{\tt -alpha} and \hbox{\tt -noalpha};
+since initial default value is set to disable translucency, using
+translucent colors requires option {\tt -\nobreak alpha} on the command
+line.
+
+@(config.h@>+=
+
+static int enable_alpha = 0;                /* -alpha, -noalpha; enable/disable translucency    */
+
+@ @<Check for alpha options@>=
+
+	if (!strcmp(argv[i], "-alpha"))
+		enable_alpha = 1;
+	else if (!strcmp(argv[i], "-noalpha"))
+		enable_alpha = 0;
 
 @* The End.

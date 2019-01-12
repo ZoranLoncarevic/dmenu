@@ -733,6 +733,10 @@ main(int argc, char *argv[])
 			topbar = 0;
 		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
 			fast = 1;
+		else if (!strcmp(argv[i], "-alpha"))
+			enable_alpha = 1;
+		else if (!strcmp(argv[i], "-noalpha"))
+			enable_alpha = 0;
 		else if (!strcmp(argv[i], "-dyn"))
 			dynheight = 1;
 		else if (!strcmp(argv[i], "-xc"))
@@ -818,7 +822,7 @@ main(int argc, char *argv[])
 	}
 	XFree(infos);
 
-	if (!visual) {
+	if (!visual || !enable_alpha) {
 		visual = DefaultVisual(dpy, screen);
 		depth = DefaultDepth(dpy, screen);
 		cmap = DefaultColormap(dpy, screen);
