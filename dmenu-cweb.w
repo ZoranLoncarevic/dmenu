@@ -212,6 +212,7 @@ setup(void)
 	@<Initialize color schemes@>;@/
 	@<Prepare to fetch X selection@>;@/
 	@<Calculate menu geometry with respect to {\tt XINERAMA}@>;
+	@<Put out dimming overlay@>;
 	@<Apply geometry as specified on the command line@>;
 	@<Create menu window@>;
 	@<Open input methods@>;
@@ -228,8 +229,7 @@ else (\nop|SchemeNorm|\nop).
 
 In the original version of program, colorscheme array |colors|'s initialization
 was grouped together with other configuration parameters in file {\tt config.h};
-in this version, for the sake of simplicity, it is moved here. Finally, note
-that colorschemes can be modified at run-time using command line parameters.
+in this version, for the sake of simplicity, it is moved here.
 
 @s Clr int
 @<Global variables@>+=
@@ -1966,6 +1966,7 @@ for itself. (See table immediately below for an overview of supported options.)
 	}
 	else @<Check for centering options@>@;
 	else @<Check for alpha options@>@;
+	else @<Check for dimming option@>@;
 	else if (i + 1 == argc)
 		usage();
 
@@ -2799,5 +2800,53 @@ static int enable_alpha = 0;                /* -alpha, -noalpha; enable/disable 
 		enable_alpha = 1;
 	else if (!strcmp(argv[i], "-noalpha"))
 		enable_alpha = 0;
+
+@ {\bf Dimming background.\ } Someone asked for a way to dim the rest of
+the screen in order to focus attention to {\tt dmenu} and make it more
+readable while retaining some amount of translucency. Desaturation and
+blur were also mentioned. As a first approximation, this patch puts on
+the screen a full screen translucent overlay window filled with a given
+background color.
+
+@ This window is put out as soon as we know geometry of the monitor
+we are going to use.
+
+@<Put out dimming overlay@>=
+
+	if (dimscreen && translucency_enabled)
+	{
+		swa.override_redirect = True;
+		swa.background_pixel = strtoargb(dimcolor);
+		swa.border_pixel = 0;
+		swa.colormap = cmap;
+		dimwin = XCreateWindow(dpy, parentwin, x, y, mw, sh, 0,
+				    depth, CopyFromParent, visual,
+				    CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWColormap, &swa);
+		XSetClassHint(dpy, dimwin, &ch);
+		XMapRaised(dpy, dimwin);
+	}
+
+@ Window id is stored in a global variable, in case we might need it
+later on (we don't for now).
+
+@<Global variables@>+=
+
+static Window dimwin;
+
+@ All of this is controlled by two configuration parameters |dimscreen|,
+|dimcolor| and a new command line option {\tt -dim}.
+
+@(config.h@>+=
+
+static int dimscreen = 0;
+static const char *dimcolor = "#7f000000";
+
+@ @<Check for dimming option@>=
+
+	if (!strcmp(argv[i], "-dim")) {
+		dimscreen = enable_alpha = 1;
+		if (i+1<argc && isargb(argv[i+1]))@/
+			dimcolor = argv[++i];
+	}
 
 @* The End.

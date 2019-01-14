@@ -25,6 +25,9 @@ static int centerx = 0, centery = 0;
 static int dynheight = 0;                   /* -dyn option; if 1, dynamicaly adjust menu height */
 static int enable_alpha = 0;                /* -alpha, -noalpha; enable/disable translucency    */
 
+static int dimscreen = 0;
+static const char *dimcolor = "#7f000000";
+
 /*
  * Characters not considered part of a word while deleting words
  * for example: " /?\"&[]"

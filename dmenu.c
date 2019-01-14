@@ -51,7 +51,7 @@ static int translucency_enabled = 0;
 
 static Atom clip, utf8;
 static Display *dpy;
-static Window root, parentwin, win;
+static Window root, parentwin, win, dimwin;
 static XIC xic;
 static Visual *visual;
 static int depth;
@@ -665,6 +665,20 @@ setup(void)
 		sh = wa.height;
 	}
 
+	/* Dim screen overlay */
+	if (dimscreen && translucency_enabled)
+	{
+		swa.override_redirect = True;
+		swa.background_pixel = strtoargb(dimcolor);
+		swa.border_pixel = 0;
+		swa.colormap = cmap;
+		dimwin = XCreateWindow(dpy, parentwin, x, y, mw, sh, 0,
+				    depth, CopyFromParent, visual,
+				    CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWColormap, &swa);
+		XSetClassHint(dpy, dimwin, &ch);
+		XMapRaised(dpy, dimwin);
+	}
+
 	/* apply geometry specified on the command line */
 	if (centerx) x = (geomw ? mw - geomw : geomx) / 2;
 	else x += geomx;
@@ -737,6 +751,11 @@ main(int argc, char *argv[])
 			enable_alpha = 1;
 		else if (!strcmp(argv[i], "-noalpha"))
 			enable_alpha = 0;
+		else if (!strcmp(argv[i], "-dim")) {
+			dimscreen = enable_alpha = 1;
+			if (i+1<argc && isargb(argv[i+1]))
+				dimcolor = argv[++i];
+		}
 		else if (!strcmp(argv[i], "-dyn"))
 			dynheight = 1;
 		else if (!strcmp(argv[i], "-xc"))
