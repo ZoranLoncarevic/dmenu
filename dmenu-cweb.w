@@ -2377,16 +2377,17 @@ we apply geometry specified on the command line.
 	y += topbar ? geomy : -geomy;
 	mw = geomw  ? geomw : mw - geomx;
 
-@ This is controlled by three new command line options.
+@ This is controlled by three new command line options. For a function
+|atoi_withprcnt| see {\it percentages patch} few patches ahead.
 
 @<Check for geometry options@>=
 
 	else @+if (!strcmp(argv[i], "-x"))@t\2@>
-		geomx = atoi(argv[++i]);
+		geomx = atoi_withprcnt(argv[++i]);
 	else if (!strcmp(argv[i], "-y"))
-		geomy = atoi(argv[++i]);
+		geomy = atoi_withprcnt(argv[++i]);
 	else if (!strcmp(argv[i], "-w"))
-		geomw = atoi(argv[++i]);
+		geomw = atoi_withprcnt(argv[++i]);
 
 @ {\bf Horizontal and vertical centering.\ } Two additional configuration
 parameters determine whether menu window should be centered in horizontal
@@ -2443,6 +2444,7 @@ margin.
 
 @<Apply geometry...@>=
 
+	@<Handle percentages@>;@#
 	if (centerx) x = (geomw ? mw - geomw : geomx) / 2;
 	else x += geomx;@#
 	if (centery) y = (sh - mh) / 2;
@@ -2848,5 +2850,31 @@ static const char *dimcolor = "#7f000000";
 		if (i+1<argc && isargb(argv[i+1]))@/
 			dimcolor = argv[++i];
 	}
+
+@ {\bf Accept percentages as |x|/|y|/|width|.\ } We encode percentages
+in |geomx|, |geomy|, |geomw| as negative values, swapping function |atoi|
+in relevant places for a new function |atoi_withprcnt|.
+
+@<Functions@>+=
+
+int atoi_withprcnt(const char *str)
+{
+	char *endptr;
+	int num = strtol(str, &endptr, 10);
+
+	if (*endptr == '%')
+		num = -num;
+
+	return num;
+}
+
+
+@ These negative values are later swapped for appropriate pixel values.
+
+@<Handle percentages@>=
+
+	if (geomw<0) geomw = -(geomw/100.0) * mw;
+	if (geomx<0) geomx = -(geomx/100.0) * mw;
+	if (geomy<0) geomy = -(geomy/100.0) * mw;
 
 @* The End.

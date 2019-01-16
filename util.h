@@ -9,3 +9,5 @@ void *ecalloc(size_t nmemb, size_t size);
 
 int isargb(const char *clrname);
 unsigned long int strtoargb(const char *clrname);
+
+int atoi_withprcnt(const char *str);

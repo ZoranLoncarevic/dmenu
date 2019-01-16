@@ -680,6 +680,10 @@ setup(void)
 	}
 
 	/* apply geometry specified on the command line */
+	if (geomw<0) geomw = -(geomw/100.0) * mw;
+	if (geomx<0) geomx = -(geomx/100.0) * mw;
+	if (geomy<0) geomy = -(geomy/100.0) * mw;
+
 	if (centerx) x = (geomw ? mw - geomw : geomx) / 2;
 	else x += geomx;
 	if (centery) y = (sh - mh) / 2;
@@ -784,11 +788,11 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-gp"))  /* inter-line gap  */
 			intlinegap = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-x"))   /* geometry */
-			geomx = atoi(argv[++i]);
+			geomx = atoi_withprcnt(argv[++i]);
 		else if (!strcmp(argv[i], "-y"))
-			geomy = atoi(argv[++i]);
+			geomy = atoi_withprcnt(argv[++i]);
 		else if (!strcmp(argv[i], "-w"))
-			geomw = atoi(argv[++i]);
+			geomw = atoi_withprcnt(argv[++i]);
 		else if (!strcmp(argv[i], "-nb"))  /* normal background color */
 			colors[SchemeNorm][ColBg] = argv[++i];
 		else if (!strcmp(argv[i], "-nf"))  /* normal foreground color */

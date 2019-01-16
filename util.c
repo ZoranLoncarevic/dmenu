@@ -81,3 +81,14 @@ unsigned long int strtoargb(const char *clrname)
 
 	return result;
 }
+
+int atoi_withprcnt(const char *str)
+{
+	char *endptr;
+	int num = strtol(str, &endptr, 10);
+
+	if (*endptr == '%')
+		num = -num;
+
+	return num;
+}
