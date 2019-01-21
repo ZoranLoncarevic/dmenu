@@ -26,9 +26,10 @@
                              * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
 #define LENGTH(X)             (sizeof X / sizeof X[0])
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+#define MENUHEIGHT(lines)     ((lines + 1) * (bh + intlinegap) + sepwidth + 2*seppad)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut, SchemeSeparator, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -160,8 +161,15 @@ drawmenu(void)
 		drw_rect(drw, x + curpos, y + 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
 	}
 
+	/* draw separator line */
+	if (sepwidth) {
+		drw_setscheme(drw, scheme[SchemeSeparator]);
+		drw_rect(drw, x, y + intlinegap + bh + seppad, mw - x, sepwidth, 1, 0);
+	}
+
 	if (lines > 0) {
 		/* draw vertical list */
+		y += sepwidth ? sepwidth + 2*seppad : 0;
 		for (item = curr; item != next; item = item->right, linesdrawn++)
 			drawitem(item, x, y += intlinegap+bh, mw - x);
 	} else if (matches) {
@@ -183,7 +191,7 @@ drawmenu(void)
 	}
 
 	if (dynheight && actualheight != linesdrawn) {
-		XResizeWindow(drw->dpy, win, mw, (linesdrawn + 1) * (bh + intlinegap));
+		XResizeWindow(drw->dpy, win, mw, MENUHEIGHT(linesdrawn));
 		actualheight = linesdrawn;
 	}
 	drw_map(drw, win, 0, 0, mw, mh);
@@ -621,7 +629,7 @@ setup(void)
 	bh = drw->fonts->h + 2;
 	bh = MAX(bh, lineheight);
 	lines = MAX(lines, 0);
-	mh = (lines + 1) * (bh + intlinegap);
+	mh = MENUHEIGHT(lines);
 #ifdef XINERAMA
 	i = 0;
 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
@@ -793,6 +801,12 @@ main(int argc, char *argv[])
 			geomy = atoi_withprcnt(argv[++i]);
 		else if (!strcmp(argv[i], "-w"))
 			geomw = atoi_withprcnt(argv[++i]);
+		else if (!strcmp(argv[i], "-sepw"))
+			sepwidth = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-sepc"))
+			colors[SchemeSeparator][ColFg] = argv[++i];
+		else if (!strcmp(argv[i], "-sepp"))
+			seppad = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-nb"))  /* normal background color */
 			colors[SchemeNorm][ColBg] = argv[++i];
 		else if (!strcmp(argv[i], "-nf"))  /* normal foreground color */

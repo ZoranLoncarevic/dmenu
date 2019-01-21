@@ -12,6 +12,7 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeNorm] = { "#bbbbbb", "#222222" },
 	[SchemeSel] = { "#eeeeee", "#005577" },
 	[SchemeOut] = { "#000000", "#00ffff" },
+	[SchemeSeparator] = { "#555555", "#222222" }
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;
@@ -27,6 +28,9 @@ static int enable_alpha = 0;                /* -alpha, -noalpha; enable/disable 
 
 static int dimscreen = 0;
 static const char *dimcolor = "#7f000000";
+
+static int sepwidth = 0;
+static int seppad = 0;
 
 /*
  * Characters not considered part of a word while deleting words

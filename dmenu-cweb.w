@@ -234,12 +234,13 @@ in this version, for the sake of simplicity, it is moved here.
 @s Clr int
 @<Global variables@>+=
 
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast };@#
+enum { @+SchemeNorm, SchemeSel, SchemeOut, SchemeLast @+};@#
 
 static const char *colors[SchemeLast][2] = { @t\1@>@/
 	[SchemeNorm] = { "#bbbbbb", "#222222" },@/
 	[SchemeSel] = { "#eeeeee", "#005577" },@/
-	[SchemeOut] = { "#000000", "#00ffff" },@t\2@>@/
+	[SchemeOut] = { "#000000", "#00ffff" },@/
+	[SchemeSeparator] = { "#555555", "#222222" }@t\2@>@/@/
 };@#
 
 static Clr *scheme[SchemeLast];
@@ -267,7 +268,7 @@ plus 2 pixels can be overriden by configuration parameter {\tt lineheight}.
 	bh = drw->fonts->h + 2;
 	bh = MAX(bh, lineheight);
 	lines = MAX(lines, 0);
-	mh = (lines + 1) * (bh + intlinegap);
+	mh = MENUHEIGHT(lines);
 
 @ If client wasn't compiled with {\tt XINERAMA} support or {\tt XINERAMA}
 extension isn't active on the server, simply set menu's geometry according
@@ -447,7 +448,8 @@ drawmenu(void)
 	@<Clear PixMap@>;
 	@<Draw prompt@>;
 	@<Draw input field@>;
-	@<Draw cursor@>;@#
+	@<Draw cursor@>;
+	@<Draw separator line@>;@#
 
 	if (lines > 0) @<Draw vertical list@>;
 	else if (matches) @<Draw horizontal list@>;@#
@@ -509,6 +511,7 @@ cursor with text now centered within potentially heigher
 @ Vertical list is easier to draw.
 
 @<Draw vertical list@>=
+	@<Adjust for separator line@>;
 	for (item = curr; item != next; item = item->right, linesdrawn++) @/
 		drawitem(item, x, y += intlinegap+bh, mw - x);
 
@@ -1992,6 +1995,7 @@ for itself. (See table immediately below for an overview of supported options.)
 	else @<Check for min line height patch option@>@;
 	else @<Check for inter-line gap option@>@;
 	else @<Check for geometry options@>;
+	else @<Check for separator options@>;
 	else usage();
 
 @ Two-line instructions regarding use of this program are printed to |stderr|
@@ -2497,7 +2501,7 @@ option is active, we take action and resize the window.
 @<Resize window, if necessary@>=
 
 	if (dynheight && actualheight != linesdrawn) {
-		XResizeWindow(drw->dpy, win, mw, (linesdrawn + 1) * (bh + intlinegap));
+		XResizeWindow(drw->dpy, win, mw, MENUHEIGHT(linesdrawn));
 		actualheight = linesdrawn;
 	}
 
@@ -2877,4 +2881,56 @@ int atoi_withprcnt(const char *str)
 	if (geomx<0) geomx = -(geomx/100.0) * mw;
 	if (geomy<0) geomy = -(geomy/100.0) * mw;
 
+@ {\bf Add option to draw separator line.\ } This line is drawn between
+the input line and displayed menu items when menu is in vertical mode.
+New configuration parameters include line width, size of the padding on
+each side of the line.
+
+@(config.h@>+=
+
+static int sepwidth = 0;
+static int seppad = 0;
+
+@ The line is drawn using new color scheme |SchemeSeparator|.
+
+@<Global variables@>+=
+
+enum { @+SchemeNorm, SchemeSel, SchemeOut, SchemeLast @+};@#
+
+static const char *colors[SchemeLast][2] = { @t\1@>@/
+	[SchemeNorm] = { "#bbbbbb", "#222222" },@/
+	[SchemeSel] = { "#eeeeee", "#005577" },@/
+	[SchemeOut] = { "#000000", "#00ffff" },@/
+	[SchemeSeparator] = { "#555555", "#222222" }@t\2@>@/@/
+};
+
+@ Menu height must include space for new separator line; now is
+also the right time to refactor this expression into macro |MENUHEIGHT|.
+
+@d MENUHEIGHT(lines) ((lines + 1) * (bh + intlinegap) + sepwidth + 2*seppad)
+
+@ @<Draw separator line@>=
+
+	if (sepwidth) {
+		drw_setscheme(drw, scheme[SchemeSeparator]);
+		drw_rect(drw, x, y + intlinegap + bh + seppad, mw - x, sepwidth, 1, 0);
+	}
+
+@ Menu items in vertical mode must be shifted down in order not
+to overlap with separator line.
+
+@<Adjust for separator line@>=
+
+		y += sepwidth ? sepwidth + 2*seppad : 0;
+
+@ All of this is controlled by three command line options.
+
+@<Check for separator options@>=
+
+		if (!strcmp(argv[i], "-sepw"))@/
+			sepwidth = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-sepc"))@/
+			colors[SchemeSeparator][ColFg] = argv[++i];
+		else if (!strcmp(argv[i], "-sepp"))@/
+			seppad = atoi(argv[++i]);
 @* The End.
