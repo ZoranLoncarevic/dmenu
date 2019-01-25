@@ -26,10 +26,12 @@
                              * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
 #define LENGTH(X)             (sizeof X / sizeof X[0])
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
-#define MENUHEIGHT(lines)     ((lines + 1) * (bh + intlinegap) + sepwidth + 2*seppad)
+#define BOFFSET               (borderwidth + borderpad)
+#define MENUHEIGHT(lines)     ((lines + 1) * (bh + intlinegap) + sepwidth + 2*seppad + 2*BOFFSET)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeSeparator, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut,
+       SchemeSeparator, SchemeBorder, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -49,6 +51,7 @@ static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
 static int actualheight = 0;
 static int translucency_enabled = 0;
+static int border_done = 0;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -87,7 +90,7 @@ calcoffsets(void)
 	if (lines > 0)
 		n = lines * bh;
 	else
-		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">"));
+		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">") + 2*BOFFSET);
 	/* calculate which items will begin the next page and previous page */
 	for (i = 0, next = curr; next; next = next->right)
 		if ((i += (lines > 0) ? bh : MIN(TEXTW(next->text), n)) > n)
@@ -121,6 +124,26 @@ cistrstr(const char *s, const char *sub)
 	return NULL;
 }
 
+static void
+drawborder(int lines)
+{
+	drw_setscheme(drw, scheme[SchemeBorder]);
+	drw_rect(drw, 0, 0, mw, MENUHEIGHT(lines), 1, 0);
+	drw_setscheme(drw, scheme[SchemeNorm]);
+	drw_rect(drw, borderwidth, borderwidth , mw-2*borderwidth, MENUHEIGHT(lines)-2*borderwidth, 1, 1);
+	border_done = 1;
+}
+
+static int
+count_lines(void)
+{
+	int nlines = 0;
+	struct item *item;
+
+	for (item = curr; item != next; item = item->right, nlines++) ;
+	return nlines;
+}
+
 static int
 drawitem(struct item *item, int x, int y, int w)
 {
@@ -139,19 +162,25 @@ drawmenu(void)
 {
 	unsigned int curpos;
 	struct item *item;
-	int x = 0, y = intlinegap/2, w;
+	int off = BOFFSET;
+	int x = off, y = off + intlinegap/2, w;
 	int fh = drw->fonts->h;
-	int linesdrawn = 0;
+	int linesdrawn = dynheight ? count_lines() : lines;
 
+	/* draw border */
 	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_rect(drw, 0, 0, mw, mh, 1, 1);
+	if (!border_done ||
+	    (lines > 0 && linesdrawn != actualheight))
+		drawborder(linesdrawn);
+	else
+		drw_rect(drw, off, off, mw-2*off, MENUHEIGHT(linesdrawn)-2*off, 1, 1);
 
 	if (prompt && *prompt) {
 		drw_setscheme(drw, scheme[SchemeSel]);
 		x = drw_text(drw, x, y, promptw, bh, lrpad / 2, prompt, 0);
 	}
 	/* draw input field */
-	w = (lines > 0 || !matches) ? mw - x : inputw;
+	w = (lines > 0 || !matches) ? mw - x - 2*BOFFSET : inputw;
 	drw_setscheme(drw, scheme[SchemeNorm]);
 	drw_text(drw, x, y, w, bh, lrpad / 2, text, 0);
 
@@ -164,14 +193,14 @@ drawmenu(void)
 	/* draw separator line */
 	if (sepwidth) {
 		drw_setscheme(drw, scheme[SchemeSeparator]);
-		drw_rect(drw, x, y + intlinegap + bh + seppad, mw - x, sepwidth, 1, 0);
+		drw_rect(drw, x, y + intlinegap + bh + seppad, mw - x - off, sepwidth, 1, 0);
 	}
 
 	if (lines > 0) {
 		/* draw vertical list */
 		y += sepwidth ? sepwidth + 2*seppad : 0;
-		for (item = curr; item != next; item = item->right, linesdrawn++)
-			drawitem(item, x, y += intlinegap+bh, mw - x);
+		for (item = curr; item != next; item = item->right)
+			drawitem(item, x, y += intlinegap+bh, mw - x - off);
 	} else if (matches) {
 		/* draw horizontal list */
 		x += inputw;
@@ -186,7 +215,7 @@ drawmenu(void)
 		if (next) {
 			w = TEXTW(">");
 			drw_setscheme(drw, scheme[SchemeNorm]);
-			drw_text(drw, mw - w, y, w, bh, lrpad / 2, ">", 0);
+			drw_text(drw, mw - w - off, y, w, bh, lrpad / 2, ">", 0);
 		}
 	}
 
@@ -807,6 +836,12 @@ main(int argc, char *argv[])
 			colors[SchemeSeparator][ColFg] = argv[++i];
 		else if (!strcmp(argv[i], "-sepp"))
 			seppad = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-borderw"))
+			borderwidth = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-borderp"))
+			borderpad = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-borderc"))
+			colors[SchemeBorder][ColFg] = argv[++i];
 		else if (!strcmp(argv[i], "-nb"))  /* normal background color */
 			colors[SchemeNorm][ColBg] = argv[++i];
 		else if (!strcmp(argv[i], "-nf"))  /* normal foreground color */

@@ -779,10 +779,7 @@ calcoffsets(void)
 {
 	int i, n;
 
-	if (lines > 0)
-		n = lines * bh;
-	else
-		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">"));@#
+	@<Set |n| to the total space available for displaying menu items@>;@#
 
 	for (i = 0, next = curr; next; next = next->right)
 		if ((i += (lines > 0) ? bh : MIN(TEXTW(next->text), n)) > n)
@@ -791,6 +788,13 @@ calcoffsets(void)
 		if ((i += (lines > 0) ? bh : MIN(TEXTW(prev->left->text), n)) > n)
 			break;
 }
+
+@ @<Set |n| to the total space available for displaying menu items@>=
+
+	if (lines > 0)
+		n = lines * bh;
+	else
+		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">"));
 
 @* The input text field. Although program creates just one window and the widget
 is painted all in one peace, conceptually it consists of two different parts:
@@ -2895,7 +2899,7 @@ static int seppad = 0;
 
 @<Global variables@>+=
 
-enum { @+SchemeNorm, SchemeSel, SchemeOut, SchemeLast @+};@#
+enum { @+SchemeNorm, SchemeSel, SchemeOut, SchemeSeparator, SchemeLast @+};@#
 
 static const char *colors[SchemeLast][2] = { @t\1@>@/
 	[SchemeNorm] = { "#bbbbbb", "#222222" },@/
@@ -2933,4 +2937,123 @@ to overlap with separator line.
 			colors[SchemeSeparator][ColFg] = argv[++i];
 		else if (!strcmp(argv[i], "-sepp"))@/
 			seppad = atoi(argv[++i]);
+
+@ {\bf Draw border around menu window.\ } While I, eventually, envision all kinds of
+borders (with rounded corners, translucent, .png templates), for now it is going to
+be solid color rectangular frame. We introduce three new configuraiton parameters ---
+border width, color and size of the padding between the border and the rest of the
+menu.
+
+@(config.h@>=
+
+static int borderwidth = 0;
+static int borderpad = 0;@#
+
+enum { @+SchemeNorm, SchemeSel, SchemeOut, SchemeSeparator, SchemeBorder, SchemeLast @+};@#
+
+static const char *colors[SchemeLast][2] = { @t\1@>@/
+	[SchemeNorm] = { "#bbbbbb", "#222222" },@/
+	[SchemeSel] = { "#eeeeee", "#005577" },@/
+	[SchemeOut] = { "#000000", "#00ffff" },@/
+	[SchemeSeparator] = { "#555555", "#222222" },@/
+	[SchemeBorder] = { "#888888", "#222222" }@t\2@>@/@/
+};
+
+@ Border increases total height of menu window by |2*(borderwidth + borderpad)|.
+
+@d BOFFSET               (borderwidth + borderpad)
+@d MENUHEIGHT(lines)     ((lines + 1) * (bh + intlinegap) + sepwidth + 2*seppad + 2*BOFFSET)
+
+@ While paginating menu items in function |calcoffsets| we should keep in mind
+the space occupied by the border which is no longer available for displaying
+these items. 
+
+@ @<Set |n| to the total space available for displaying menu items@>=
+
+	if (lines > 0)
+		n = lines * bh;
+	else
+		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">") + 2*BOFFSET);
+
+@ To make space for the border, all elements of the menu gets shifted
+down and to the righ by |BOFFSET| pixels. 
+
+@<Local variables (drawmenu)@>=
+
+	int off = BOFFSET;
+	int x = off, y = off + intlinegap/2, w;
+
+@ While drawing various menu elements, we keep in mind that effective
+drawing area ends at |BOFFSET| pixels from the right edge of the window.
+
+@<Draw input field@>=
+
+	w = (lines > 0 || !matches) ? mw - x - 2*BOFFSET : inputw;
+	drw_text(drw, x, y, w, bh, lrpad / 2, text, 0);
+	x += inputw;
+
+@ @<Draw separator line@>=
+	if (sepwidth) {
+		drw_setscheme(drw, scheme[SchemeSeparator]);
+		drw_rect(drw, x, y + intlinegap + bh + seppad, mw - x - off, sepwidth, 1, 0);
+	}
+
+@ @<Draw vertical list@>=
+	for (item = curr; item != next; item = item->right) @/
+		drawitem(item, x, y += intlinegap+bh, mw - x - off);
+
+@ @<Draw horizontal list@>+=
+
+	if (next) {
+		w = TEXTW(">");
+		drw_setscheme(drw, scheme[SchemeNorm]);
+		drw_text(drw, mw - w - off, y, w, bh, lrpad / 2, ">", 0);
+	}
+
+@ The only thing that remains is to actually draw the border. We try to
+do it only when absolutely necessary --- the first time and when window
+changes size with |dynheight| on; otherwise, border that is already
+drawn on the |PixMap| is reused and we only blank the space inside.
+
+@<Clear PixMap@>=
+
+	int linesdrawn = dynheight ? count_lines() : lines;@#
+
+	drw_setscheme(drw, scheme[SchemeNorm]);
+	if (!border_done ||@/
+	    @t\ \ \ \ \ @>(lines > 0 && linesdrawn != actualheight))@/
+		drawborder(linesdrawn);
+	else@/
+		drw_rect(drw, off, off, mw-2*off, MENUHEIGHT(linesdrawn)-2*off, 1, 1);
+
+@ Since code above needs the number of menu items about to be displayed
+at the very start of the function, this couting is moved to an auxiliary
+function.
+
+@<Functions@>+=
+static int
+count_lines(void)
+{
+	int nlines = 0;@+
+	struct item *aitem;
+
+	for (aitem = curr; aitem != next; aitem = aitem->right, nlines++) ;
+	return nlines;
+}
+
+@ Drawing border and simultaneously blanking the space inside it,
+is achieved by drawing two filled rectangles, one inside the other.
+Note that colorscheme |SchemeNorm| is set upon exiting this function.
+
+@<Functions@>+=
+static void
+drawborder(int lines)
+{
+	drw_setscheme(drw, scheme[SchemeBorder]);
+	drw_rect(drw, 0, 0, mw, MENUHEIGHT(lines), 1, 0);
+	drw_setscheme(drw, scheme[SchemeNorm]);
+	drw_rect(drw, borderwidth, borderwidth , mw-2*borderwidth, MENUHEIGHT(lines)-2*borderwidth, 1, 1);
+	border_done = 1;
+}
+
 @* The End.
