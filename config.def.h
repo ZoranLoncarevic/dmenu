@@ -35,6 +35,7 @@ static int seppad = 0;
 
 static int borderwidth = 0;
 static int borderpad = 0;
+static int borderradius = 0;
 
 /*
  * Characters not considered part of a word while deleting words

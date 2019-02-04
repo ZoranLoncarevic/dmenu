@@ -3,7 +3,7 @@
 
 include config.mk
 
-SRC = drw.c dmenu.c stest.c util.c
+SRC = drw.c dmenu.c stest.c util.c DrRndRect.c border.c
 OBJ = $(SRC:.c=.o)
 
 all: options dmenu stest
@@ -26,10 +26,10 @@ pdf: dmenu-cweb.dvi
 config.h:
 	cp config.def.h $@
 
-$(OBJ): arg.h config.h config.mk drw.h
+$(OBJ): arg.h config.h config.mk drw.h border.h
 
-dmenu: dmenu.o drw.o util.o
-	$(CC) -o $@ dmenu.o drw.o util.o $(LDFLAGS)
+dmenu: dmenu.o drw.o util.o DrRndRect.o border.o
+	$(CC) -o $@ dmenu.o drw.o util.o DrRndRect.o border.o $(LDFLAGS)
 
 stest: stest.o
 	$(CC) -o $@ stest.o $(LDFLAGS)

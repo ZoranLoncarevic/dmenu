@@ -268,6 +268,7 @@ plus 2 pixels can be overriden by configuration parameter {\tt lineheight}.
 	bh = drw->fonts->h + 2;
 	bh = MAX(bh, lineheight);
 	lines = MAX(lines, 0);
+	borderpad = MAX(borderpad, (int) borderradius * 0.292893);
 	mh = MENUHEIGHT(lines);
 
 @ If client wasn't compiled with {\tt XINERAMA} support or {\tt XINERAMA}
@@ -2000,6 +2001,7 @@ for itself. (See table immediately below for an overview of supported options.)
 	else @<Check for inter-line gap option@>@;
 	else @<Check for geometry options@>;
 	else @<Check for separator options@>;
+	else @<Check for border options@>;
 	else usage();
 
 @ Two-line instructions regarding use of this program are printed to |stderr|
@@ -3055,5 +3057,227 @@ drawborder(int lines)
 	drw_rect(drw, borderwidth, borderwidth , mw-2*borderwidth, MENUHEIGHT(lines)-2*borderwidth, 1, 1);
 	border_done = 1;
 }
+
+@ {\bf An option to make corners of the border round.\ } When
+configuration parameter |borderradius| is non-zero, we replace
+the four corners of the border with appropriate sections of
+circular annulus, making the whole border a rounded rectangle;
+value of this parameter is controlled by a command line
+option {\tt -borderr}.
+
+@(config.h@>+=
+
+static int borderradius = 0;
+
+@ @<Check for border options@>=
+
+	if (!strcmp(argv[i], "-borderr"))@/
+		borderradius = atoi(argv[++i]);
+
+@ Make sure input line does not intersect with the arc in the
+border by adjusting border padding if it is smaller than $1-\sqrt{2}/2$.
+We have to do it here, before |borderpad| is used for the first
+time to calculate menu height.
+
+@<Calculate menu geometry...@>=
+
+	bh = drw->fonts->h + 2;
+	bh = MAX(bh, lineheight);
+	lines = MAX(lines, 0);
+	borderpad = MAX(borderpad, (int) borderradius * 0.292893);
+	mh = MENUHEIGHT(lines);
+
+@ Rounded border is just one of many kind of borders to be introduced
+in the future. In preparation for this, all actual drawings are moved
+to a separate module {\tt border.c}, leaving for function |drawborder|
+in {\tt dmenu.c} just the task of dispatching to these new functions.
+
+@<Functions@>+=
+static void
+drawborder(int lines)
+{
+	int mh = MENUHEIGHT(lines);
+
+	if (borderradius)@/
+		draw_rounded_border(drw, mw, mh, borderwidth, borderradius,
+				scheme[SchemeBorder], scheme[SchemeNorm]);
+	else@/
+		draw_border(drw, mw, mh, borderwidth,
+				scheme[SchemeBorder], scheme[SchemeNorm]);@/
+	border_done = 1;
+}
+
+@ Module {\tt border.c} uses {\tt drw.c} for all it's drawings.
+
+@(border.c@>=
+
+#include <X11/Xlib.h>
+#include <X11/Xft/Xft.h>
+#include "util.h"
+#include "drw.h"
+#include "border.h"@/@#
+
+@<Border.c functions@>@;
+
+@ The old drawing code now resides in function |draw_border|.
+
+@<Border.c functions@>=
+
+void draw_border(Drw *drw, int mw, int mh, int borderwidth,
+			Clr *schemeBorder, Clr *schemeNorm)
+{
+	drw_setscheme(drw, schemeBorder);
+	drw_rect(drw, 0, 0, mw, mh, 1, 0);
+	drw_setscheme(drw, schemeNorm);
+	drw_rect(drw, borderwidth, borderwidth , mw-2*borderwidth, mh-2*borderwidth, 1, 1);
+}
+
+@ Similar to the code above, new rounded borders are drawn as two filled
+rounded rectangles, one inside the other.
+
+@<Border.c functions@>+=
+
+void draw_rounded_border(Drw *drw, int mw, int mh, int borderwidth, int borderradius,
+			Clr *schemeBorder, Clr *schemeNorm)
+{
+	drw_setscheme(drw, schemeBorder);
+	drw_rect(drw, 0, 0, mw, mh, 1, 1);
+	drw_rounded_rect(drw, 0, 0, mw, mh, borderradius, 1, 0);
+	drw_setscheme(drw, schemeNorm);
+	drw_rounded_rect(drw, borderwidth, borderwidth , mw-2*borderwidth, mh-2*borderwidth,
+		borderradius > borderwidth ? borderradius - borderwidth : borderradius, 1, 1);
+}
+
+@ Function |drw_rounded_rect| used above contains glue code 
+--- it's purpose is to provide consistent interface to functions
+that actually draw rounded rectangles.
+
+@<Drw module functions@>+=
+void
+drw_rounded_rect(Drw *drw, int x, int y, unsigned int w, unsigned int h, int r, int filled, int invert)
+{
+	if (!drw || !drw->scheme)@/
+		return;@#
+	XSetForeground(drw->dpy, drw->gc, invert ? drw->scheme[ColBg].pixel : drw->scheme[ColFg].pixel);@#
+	if (filled)@/
+		XmuFillRoundedRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h, r, r);
+	else@/
+		XmuDrawRoundedRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h, r, r);
+}
+
+@ Functions |XmuFillRoundedRectangle| and companion |XmuDrawRoundedRectangle|
+are taken directly from {\tt libXmu}\footnote*{Available at {\tt git://github.com/freedesktop/libXmu}};
+both use only standard X server primitives for drawing arcs and
+rectangles. In particular, |XmuFillRoundedRectangle| renders
+filled rounded rectangle using 4 filled quarters of a circle
+and 3 rectangles --- two at the left and right edge
+spanning in vertical direction between upper and
+lower quarter circle at the corners, and one in the center
+between those two.
+
+@s XArc int
+@s XRectangle int
+@s XGCValues int
+@(border.c@>=
+void
+XmuFillRoundedRectangle(Display *dpy, Drawable draw, GC gc, @/
+@t\ \ \ \ \ \ \ \ \ \ \ @>int x, int y, int w, int h, int ew, int eh)
+{
+ 	XArc arcs[4];
+ 	XRectangle rects[3];
+	XGCValues vals;
+	int ew2, eh2;
+
+	@<Set arc mode@>;
+  	@<Check for parameter consistency@>;@#
+
+	@<Draw 4 arcs@>;
+	@<Draw 3 rectangles@>;@#
+
+	@<Restore arc mode, if necessary@>;
+}
+
+@ The primitive |XFillArcs| has two modes of operation,
+filling either area between an arc and two radii (a sector),
+or between an arc and corresponding chord; we make sure
+to activate the former.
+
+@<Set arc mode@>=
+
+	XGetGCValues(dpy, gc, GCArcMode, &vals);
+	if (vals.arc_mode != ArcPieSlice)@/
+		XSetArcMode(dpy, gc, ArcPieSlice);
+
+@ If there is no space to draw arcs of specified radius,
+drop them alltogether.
+
+@<Check for parameter consistency@>=
+
+	if ((ew2 = (ew << 1)) > w)@/
+		ew2 = ew = 0;
+	if ((eh2 = (eh << 1)) > h)@/
+		eh2 = eh = 0;
+
+@ Each corner consists of a quarter of a circle. 
+
+@<Draw 4 arcs@>=
+
+	arcs[0].x = x;
+	arcs[0].y = y;
+	arcs[0].width = ew2;
+	arcs[0].height = eh2;
+	arcs[0].angle1 = 180 * 64;
+	arcs[0].angle2 = -90 * 64;
+
+@ @<Draw 4 arcs@>+=
+
+	arcs[1].x = x + w - ew2 - 1;
+	arcs[1].y = y;
+	arcs[1].width = ew2;
+	arcs[1].height = eh2;
+	arcs[1].angle1 = 90 * 64;
+	arcs[1].angle2 = -90 * 64;@#
+
+	arcs[2].x = x + w - ew2 - 1;
+	arcs[2].y = y + h - eh2 - 1;
+	arcs[2].width = ew2;
+	arcs[2].height = eh2;
+	arcs[2].angle1 = 0;
+	arcs[2].angle2 = -90 * 64;@#
+
+	arcs[3].x = x;
+	arcs[3].y = y + h - eh2 - 1;
+	arcs[3].width = ew2;
+	arcs[3].height = eh2;
+	arcs[3].angle1 = 270 * 64;
+	arcs[3].angle2 = -90 * 64;@#
+
+	XFillArcs(dpy, draw, gc, arcs, 4);
+
+@ @<Draw 3 rectangles@>=
+
+	rects[0].x = x + ew;
+	rects[0].y = y;
+	rects[0].width = w - ew2;
+	rects[0].height = h;@#
+
+	rects[1].x = x;
+	rects[1].y = y + eh;
+	rects[1].width = ew;
+	rects[1].height = h - eh2;@#
+
+	rects[2].x = x + w - ew;
+	rects[2].y = y + eh;
+	rects[2].width = ew;
+	rects[2].height = h - eh2;@#
+
+	XFillRectangles(dpy, draw, gc, rects, 3);
+
+@ Before returning, we restore previously saved arc drawing mode.
+
+@<Restore arc mode, if necessary@>=
+
+	if (vals.arc_mode != ArcPieSlice)@/
+		XSetArcMode(dpy, gc, vals.arc_mode);
 
 @* The End.

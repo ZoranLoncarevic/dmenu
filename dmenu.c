@@ -20,6 +20,7 @@
 
 #include "drw.h"
 #include "util.h"
+#include "border.h"
 
 /* macros */
 #define INTERSECT(x,y,w,h,r)  (MAX(0, MIN((x)+(w),(r).x_org+(r).width)  - MAX((x),(r).x_org)) \
@@ -127,10 +128,14 @@ cistrstr(const char *s, const char *sub)
 static void
 drawborder(int lines)
 {
-	drw_setscheme(drw, scheme[SchemeBorder]);
-	drw_rect(drw, 0, 0, mw, MENUHEIGHT(lines), 1, 0);
-	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_rect(drw, borderwidth, borderwidth , mw-2*borderwidth, MENUHEIGHT(lines)-2*borderwidth, 1, 1);
+	int mh = MENUHEIGHT(lines);
+
+	if (borderradius)
+		draw_rounded_border(drw, mw, mh, borderwidth, borderradius,
+				scheme[SchemeBorder], scheme[SchemeNorm]);
+	else
+		draw_border(drw, mw, mh, borderwidth,
+				scheme[SchemeBorder], scheme[SchemeNorm]);
 	border_done = 1;
 }
 
@@ -658,6 +663,7 @@ setup(void)
 	bh = drw->fonts->h + 2;
 	bh = MAX(bh, lineheight);
 	lines = MAX(lines, 0);
+	borderpad = MAX(borderpad, (int) borderradius * 0.292893);
 	mh = MENUHEIGHT(lines);
 #ifdef XINERAMA
 	i = 0;
@@ -840,8 +846,12 @@ main(int argc, char *argv[])
 			borderwidth = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-borderp"))
 			borderpad = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-borderc"))
+		else if (!strcmp(argv[i], "-borderr"))
+			borderradius = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-bordercf"))
 			colors[SchemeBorder][ColFg] = argv[++i];
+		else if (!strcmp(argv[i], "-bordercb"))
+			colors[SchemeBorder][ColBg] = argv[++i];
 		else if (!strcmp(argv[i], "-nb"))  /* normal background color */
 			colors[SchemeNorm][ColBg] = argv[++i];
 		else if (!strcmp(argv[i], "-nf"))  /* normal foreground color */
