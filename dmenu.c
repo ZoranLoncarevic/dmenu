@@ -130,10 +130,14 @@ drawborder(int lines)
 {
 	int mh = MENUHEIGHT(lines);
 
-	if (borderradius)
-		draw_rounded_border(drw, mw, mh, borderwidth, borderradius,
-				scheme[SchemeBorder], scheme[SchemeNorm]);
-	else
+	if (borderradius) {
+		if (drw->depth == 24 || drw->depth == 32)
+			draw_antialiased_rounded_border(drw, mw, mh, borderwidth, borderradius,
+					scheme[SchemeBorder], scheme[SchemeNorm]);
+		else
+			draw_rounded_border(drw, mw, mh, borderwidth, borderradius,
+					scheme[SchemeBorder], scheme[SchemeNorm]);
+	} else
 		draw_border(drw, mw, mh, borderwidth,
 				scheme[SchemeBorder], scheme[SchemeNorm]);
 	border_done = 1;
