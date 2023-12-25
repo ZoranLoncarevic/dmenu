@@ -3279,5 +3279,8 @@ drop them alltogether.
 
 	if (vals.arc_mode != ArcPieSlice)@/
 		XSetArcMode(dpy, gc, vals.arc_mode);
+@
+
+@<Perform neccessary cleanup@>=
 
 @* The End.
