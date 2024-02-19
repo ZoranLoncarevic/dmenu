@@ -262,7 +262,7 @@ grabkeyboard(void)
 		return;
 	/* try to grab keyboard, we may have to wait for another process to ungrab */
 	for (i = 0; i < 1000; i++) {
-		if (XGrabKeyboard(dpy, DefaultRootWindow(dpy), True, GrabModeAsync,
+		if (XGrabKeyboard(dpy, win, True, GrabModeAsync,
 		                  GrabModeAsync, CurrentTime) == GrabSuccess)
 			return;
 		nanosleep(&ts, NULL);
@@ -769,6 +769,8 @@ setup(void)
 		}
 		grabfocus();
 	}
+	grabkeyboard();
+	grabfocus();
 	drw_resize(drw, mw, mh);
 	drawmenu();
 }
@@ -930,13 +932,7 @@ main(int argc, char *argv[])
 		die("pledge");
 #endif
 
-	if (fast) {
-		grabkeyboard();
-		readstdin();
-	} else {
-		readstdin();
-		grabkeyboard();
-	}
+	readstdin();
 	setup();
 	run();
 
